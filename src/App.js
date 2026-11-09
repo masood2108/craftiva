@@ -1,9 +1,16 @@
 import { useState } from "react";
-import { Routes, Route, Link } from "react-router-dom";
+import {
+  Routes,
+  Route,
+  Link,
+  useLocation,
+} from "react-router-dom";
 import toast from "react-hot-toast";
+
 import ScrollToTop from "./components/ScrollToTop";
 import Navbar from "./components/Navbar";
 import AdminRoute from "./components/AdminRoute";
+
 import PaymentScreenshots from "./pages/PaymentScreenshots";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -87,6 +94,7 @@ function Footer() {
             Contact Us
           </a>
         </div>
+
       </div>
 
       <div className="container-shell mt-16 flex flex-col justify-between gap-4 border-t border-white/15 pt-6 sm:flex-row sm:items-center">
@@ -104,6 +112,11 @@ function Footer() {
 
 export default function App() {
   const [cart, setCart] = useState([]);
+
+  const location = useLocation();
+
+  // Hide storefront navigation on admin pages
+  const isAdminPage = location.pathname.startsWith("/admin");
 
   const getCartItemKey = (item) =>
     item.cartItemId || item.id;
@@ -170,10 +183,15 @@ export default function App() {
 
   return (
     <>
-        <ScrollToTop />
-      <Navbar cartCount={cartCount} />
+      <ScrollToTop />
+
+      {/* Storefront Navbar - hidden on admin pages */}
+      {!isAdminPage && (
+        <Navbar cartCount={cartCount} />
+      )}
 
       <Routes>
+        {/* STOREFRONT */}
         <Route
           path="/"
           element={<Home onAdd={addToCart} />}
@@ -220,12 +238,13 @@ export default function App() {
           element={<OrderSuccess />}
         />
 
-        {/* ADMIN */}
+        {/* ADMIN LOGIN */}
         <Route
           path="/admin/login"
           element={<AdminLogin />}
         />
 
+        {/* ADMIN DASHBOARD */}
         <Route
           path="/admin/dashboard"
           element={
@@ -235,6 +254,7 @@ export default function App() {
           }
         />
 
+        {/* ADD PRODUCT */}
         <Route
           path="/admin/products/new"
           element={
@@ -244,6 +264,7 @@ export default function App() {
           }
         />
 
+        {/* EDIT PRODUCT */}
         <Route
           path="/admin/products/edit/:id"
           element={
@@ -253,6 +274,7 @@ export default function App() {
           }
         />
 
+        {/* ORDERS */}
         <Route
           path="/admin/orders"
           element={
@@ -261,10 +283,16 @@ export default function App() {
             </AdminRoute>
           }
         />
+
+        {/* PAYMENT SCREENSHOTS */}
         <Route
-  path="/admin/payments"
-  element={<PaymentScreenshots />}
-/>
+          path="/admin/payments"
+          element={
+            <AdminRoute>
+              <PaymentScreenshots />
+            </AdminRoute>
+          }
+        />
 
         {/* 404 */}
         <Route
@@ -294,7 +322,8 @@ export default function App() {
         />
       </Routes>
 
-      <Footer />
+      {/* Storefront Footer - hidden on admin pages */}
+      {!isAdminPage && <Footer />}
     </>
   );
 }
