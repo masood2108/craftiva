@@ -1,19 +1,43 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { Upload, Image as ImageIcon, X, CheckCircle2 } from "lucide-react";
+
+import {
+  Upload,
+  Image as ImageIcon,
+  X,
+  CheckCircle2,
+  CreditCard,
+  ExternalLink,
+} from "lucide-react";
+
+import { QRCodeSVG } from "qrcode.react";
 
 import { auth } from "../firebase";
 import { createOrder } from "../services/orderService";
 import { uploadImage } from "../services/cloudinaryService";
+import { subscribeToPaymentSettings } from "../services/settingsService";
 
 export default function Checkout({ cart, onOrderPlaced }) {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
+
   const [paymentScreenshot, setPaymentScreenshot] = useState(null);
   const [screenshotPreview, setScreenshotPreview] = useState("");
+
   const [transactionId, setTransactionId] = useState("");
+
+  const [paymentSettings, setPaymentSettings] = useState({
+    upiId: "",
+    payeeName: "CRAFTIVA",
+  });
+
+  const [paymentSettingsLoading, setPaymentSettingsLoading] =
+    useState(true);
+
+  const [paymentSettingsError, setPaymentSettingsError] =
+    useState(false);
 
   const [details, setDetails] = useState({
     name: "",
@@ -22,6 +46,32 @@ export default function Checkout({ cart, onOrderPlaced }) {
     address: "",
   });
 
+  // Subscribe to admin's UPI settings
+  useEffect(() => {
+    const unsubscribe = subscribeToPaymentSettings(
+      (data) => {
+        setPaymentSettings({
+          upiId: data.upiId || "",
+          payeeName: data.payeeName || "CRAFTIVA",
+        });
+
+        setPaymentSettingsLoading(false);
+        setPaymentSettingsError(false);
+      },
+      (error) => {
+        console.error("Payment settings error:", error);
+
+        setPaymentSettingsLoading(false);
+        setPaymentSettingsError(true);
+
+        toast.error("Unable to load payment details");
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  // Calculate total
   const total = cart.reduce(
     (sum, item) =>
       sum + Number(item.price || 0) * Number(item.quantity || 0),
@@ -31,6 +81,18 @@ export default function Checkout({ cart, onOrderPlaced }) {
   const formatPrice = (price) =>
     Number(price || 0).toLocaleString("en-IN");
 
+  // Generate dynamic UPI payment URI
+  const upiPaymentLink = paymentSettings.upiId
+    ? `upi://pay?${new URLSearchParams({
+        pa: paymentSettings.upiId.trim(),
+        pn: paymentSettings.payeeName || "CRAFTIVA",
+        am: total.toFixed(2),
+        cu: "INR",
+        tn: "CRAFTIVA Order Payment",
+      }).toString()}`
+    : "";
+
+  // Handle delivery details
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -40,6 +102,7 @@ export default function Checkout({ cart, onOrderPlaced }) {
     }));
   };
 
+  // Handle screenshot selection
   const handleScreenshotChange = (e) => {
     const file = e.target.files?.[0];
 
@@ -71,6 +134,7 @@ export default function Checkout({ cart, onOrderPlaced }) {
     setScreenshotPreview(URL.createObjectURL(file));
   };
 
+  // Remove screenshot
   const removeScreenshot = () => {
     if (screenshotPreview) {
       URL.revokeObjectURL(screenshotPreview);
@@ -80,6 +144,7 @@ export default function Checkout({ cart, onOrderPlaced }) {
     setScreenshotPreview("");
   };
 
+  // Place order
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -93,6 +158,16 @@ export default function Checkout({ cart, onOrderPlaced }) {
     if (!auth.currentUser) {
       toast.error("Please sign in before placing your order");
       navigate("/login");
+      return;
+    }
+
+    if (paymentSettingsLoading) {
+      toast.error("Please wait while payment details load");
+      return;
+    }
+
+    if (paymentSettingsError || !paymentSettings.upiId.trim()) {
+      toast.error("UPI payment is currently unavailable");
       return;
     }
 
@@ -159,36 +234,46 @@ export default function Checkout({ cart, onOrderPlaced }) {
 
       const orderData = {
         userId: auth.currentUser.uid,
+
         customerName: details.name.trim(),
         phone: details.phone,
         email: details.email.trim(),
         address: details.address.trim(),
+
         items: orderItems,
+
         total,
+
         paymentMethod: "UPI",
+
+        // Save payment account details used for this order
+        paymentUpiId: paymentSettings.upiId.trim(),
+        paymentPayeeName: paymentSettings.payeeName,
+
         paymentReference: transactionId.trim(),
         paymentScreenshot: paymentScreenshotUrl,
+
         paymentStatus: "Pending Verification",
         status: "Pending",
       };
 
       const orderId = await createOrder(orderData);
 
-      // Clear cart only after Firestore confirms order creation
       if (onOrderPlaced) {
         onOrderPlaced();
       }
 
       toast.success("Order placed successfully!");
 
-navigate(`/order-success/${orderId}`, {
-  state: {
-    order: {
-      ...orderData,
-      orderId,
-    },
-  },
-});    } catch (error) {
+      navigate(`/order-success/${orderId}`, {
+        state: {
+          order: {
+            ...orderData,
+            orderId,
+          },
+        },
+      });
+    } catch (error) {
       console.error("Order creation failed:", error);
 
       toast.dismiss("payment-upload");
@@ -215,12 +300,14 @@ navigate(`/order-success/${orderId}`, {
 
         <div className="mt-12 grid gap-12 md:grid-cols-[1fr_380px]">
 
+          {/* CHECKOUT FORM */}
           <form onSubmit={handleSubmit} className="space-y-5">
 
             <h2 className="display-font mb-5 text-3xl text-[#762F43]">
               Delivery details
             </h2>
 
+            {/* NAME */}
             <div>
               <label className="mb-2 block text-xs font-semibold text-[#762F43]">
                 Full name *
@@ -237,6 +324,7 @@ navigate(`/order-success/${orderId}`, {
               />
             </div>
 
+            {/* PHONE */}
             <div>
               <label className="mb-2 block text-xs font-semibold text-[#762F43]">
                 Phone number *
@@ -252,13 +340,16 @@ navigate(`/order-success/${orderId}`, {
                 onChange={(e) =>
                   setDetails((old) => ({
                     ...old,
-                    phone: e.target.value.replace(/\D/g, "").slice(0, 10),
+                    phone: e.target.value
+                      .replace(/\D/g, "")
+                      .slice(0, 10),
                   }))
                 }
                 className="w-full rounded-xl border border-[#DFC6C5] bg-white px-4 py-4 text-sm outline-none focus:border-[#762F43]"
               />
             </div>
 
+            {/* EMAIL */}
             <div>
               <label className="mb-2 block text-xs font-semibold text-[#762F43]">
                 Email address *
@@ -275,6 +366,7 @@ navigate(`/order-success/${orderId}`, {
               />
             </div>
 
+            {/* ADDRESS */}
             <div>
               <label className="mb-2 block text-xs font-semibold text-[#762F43]">
                 Full delivery address *
@@ -299,6 +391,7 @@ navigate(`/order-success/${orderId}`, {
               </h3>
 
               <div className="mt-4 flex items-center gap-3">
+
                 <div className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#762F43]">
                   <div className="h-2.5 w-2.5 rounded-full bg-[#762F43]" />
                 </div>
@@ -312,46 +405,102 @@ navigate(`/order-success/${orderId}`, {
                     Prepaid orders only. Cash on delivery unavailable.
                   </p>
                 </div>
+
               </div>
 
-              {/* QR CODE */}
+              {/* DYNAMIC UPI QR */}
               <div className="mt-6 rounded-xl border border-[#E9D8D6] bg-[#FAF5F2] p-5 text-center">
 
-                <p className="text-sm font-semibold text-[#762F43]">
-                  Scan & Pay
-                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <CreditCard size={18} className="text-[#762F43]" />
 
-                <p className="mt-1 text-xs text-[#927F80]">
-                  Scan QR code using PhonePe, Google Pay or any UPI app.
-                </p>
-
-                <div className="mx-auto mt-5 w-fit rounded-xl border border-[#E9D8D6] bg-white p-3">
-                  <img
-                    src="/images/phonepe-qr.png"
-                    alt="CRAFTIVA PhonePe Payment QR"
-                    className="h-64 w-64 object-contain"
-                  />
-                </div>
-
-                <div className="mt-5 rounded-lg bg-white p-4">
-                  <p className="text-xs text-[#927F80]">
-                    Amount to pay
-                  </p>
-
-                  <p className="mt-1 text-2xl font-bold text-[#762F43]">
-                    ₹{formatPrice(total)}
+                  <p className="text-sm font-semibold text-[#762F43]">
+                    Scan & Pay
                   </p>
                 </div>
 
-                <p className="mt-4 text-xs leading-5 text-[#927F80]">
-                  Complete your payment first. Then upload payment
-                  screenshot below. Your order will be confirmed
-                  after admin verifies payment.
-                </p>
+                {paymentSettingsLoading ? (
+                  <p className="mt-6 text-sm text-gray-500">
+                    Loading payment details...
+                  </p>
+                ) : paymentSettingsError ? (
+                  <p className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-600">
+                    Unable to load payment details. Please refresh the page.
+                  </p>
+                ) : !paymentSettings.upiId ? (
+                  <p className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-600">
+                    UPI payment is currently unavailable. Please contact the store.
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-2 text-xs text-[#927F80]">
+                      Scan using PhonePe, Google Pay, Paytm or another UPI app.
+                    </p>
+
+                    {/* QR CODE */}
+                    <div className="mx-auto mt-5 w-fit rounded-xl border border-[#E9D8D6] bg-white p-4">
+
+                      <QRCodeSVG
+                        value={upiPaymentLink}
+                        size={230}
+                        level="H"
+                        includeMargin
+                      />
+
+                    </div>
+
+                    {/* UPI DETAILS */}
+                    <div className="mt-5 rounded-lg bg-white p-4">
+
+                      <p className="text-xs text-[#927F80]">
+                        Payee name
+                      </p>
+
+                      <p className="mt-1 text-sm font-semibold text-[#762F43]">
+                        {paymentSettings.payeeName}
+                      </p>
+
+                      <p className="mt-4 text-xs text-[#927F80]">
+                        UPI ID
+                      </p>
+
+                      <p className="mt-1 break-all text-sm font-semibold text-[#762F43]">
+                        {paymentSettings.upiId}
+                      </p>
+
+                      <p className="mt-4 text-xs text-[#927F80]">
+                        Amount to pay
+                      </p>
+
+                      <p className="mt-1 text-2xl font-bold text-[#762F43]">
+                        ₹{formatPrice(total)}
+                      </p>
+
+                    </div>
+
+                    {/* OPEN UPI APP */}
+                    <a
+                      href={upiPaymentLink}
+                      className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#762F43] py-4 text-xs font-bold uppercase tracking-widest text-white transition hover:bg-[#5E2334]"
+                    >
+                      Pay ₹{formatPrice(total)} via UPI
+
+                      <ExternalLink size={15} />
+                    </a>
+
+                    <p className="mt-4 text-xs leading-5 text-[#927F80]">
+                      Complete payment first. Then upload your payment
+                      screenshot below. Your order will be confirmed
+                      after admin verifies payment.
+                    </p>
+                  </>
+                )}
+
               </div>
 
               {/* TRANSACTION ID */}
               <div className="mt-6">
+
                 <label className="mb-2 block text-xs font-semibold text-[#762F43]">
                   UPI Transaction ID (Optional)
                 </label>
@@ -363,6 +512,7 @@ navigate(`/order-success/${orderId}`, {
                   placeholder="Enter UPI transaction ID"
                   className="w-full rounded-xl border border-[#DFC6C5] bg-white px-4 py-4 text-sm outline-none focus:border-[#762F43]"
                 />
+
               </div>
 
               {/* SCREENSHOT UPLOAD */}
@@ -393,6 +543,7 @@ navigate(`/order-success/${orderId}`, {
                       onChange={handleScreenshotChange}
                       className="hidden"
                     />
+
                   </label>
                 ) : (
                   <div className="relative rounded-xl border border-[#DFC6C5] bg-[#FAF5F2] p-3">
@@ -422,7 +573,9 @@ navigate(`/order-success/${orderId}`, {
 
               </div>
 
+              {/* PAYMENT NOTE */}
               <div className="mt-5 flex items-start gap-2 rounded-lg bg-[#FAF5F2] p-3">
+
                 <ImageIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#A66D78]" />
 
                 <p className="text-xs leading-5 text-[#927F80]">
@@ -430,10 +583,12 @@ navigate(`/order-success/${orderId}`, {
                   payment. Orders without payment proof cannot be
                   submitted.
                 </p>
+
               </div>
 
             </div>
 
+            {/* LOGIN WARNING */}
             {!auth.currentUser && (
               <p className="text-xs text-red-600">
                 Please{" "}
@@ -444,10 +599,17 @@ navigate(`/order-success/${orderId}`, {
               </p>
             )}
 
+            {/* PLACE ORDER */}
             <button
               type="submit"
-              disabled={loading || !cart.length}
-              className="w-full rounded-full bg-[#762F43] py-4 text-xs font-bold uppercase tracking-widest text-white hover:bg-[#5E2334] disabled:opacity-50"
+              disabled={
+                loading ||
+                !cart.length ||
+                paymentSettingsLoading ||
+                paymentSettingsError ||
+                !paymentSettings.upiId
+              }
+              className="w-full rounded-full bg-[#762F43] py-4 text-xs font-bold uppercase tracking-widest text-white transition hover:bg-[#5E2334] disabled:opacity-50"
             >
               {loading
                 ? "Uploading & placing order..."
@@ -492,6 +654,7 @@ navigate(`/order-success/${orderId}`, {
 
                     {item.selectedSize && (
                       <div className="mt-2">
+
                         <p className="text-xs text-[#806F70]">
                           Size: {item.selectedSize.name}
                         </p>
@@ -501,6 +664,7 @@ navigate(`/order-success/${orderId}`, {
                           {item.selectedSize.height}{" "}
                           {item.selectedSize.unit || "mm"}
                         </p>
+
                       </div>
                     )}
 
@@ -523,6 +687,7 @@ navigate(`/order-success/${orderId}`, {
             </div>
 
             <div className="mt-6 flex justify-between text-sm">
+
               <span className="text-[#806F70]">
                 Subtotal
               </span>
@@ -530,9 +695,11 @@ navigate(`/order-success/${orderId}`, {
               <span className="text-[#762F43]">
                 ₹{formatPrice(total)}
               </span>
+
             </div>
 
             <div className="mt-3 flex justify-between text-sm">
+
               <span className="text-[#806F70]">
                 Shipping
               </span>
@@ -540,14 +707,17 @@ navigate(`/order-success/${orderId}`, {
               <span className="text-[#762F43]">
                 Calculated separately
               </span>
+
             </div>
 
             <div className="mt-5 flex justify-between border-t border-[#DFC6C5] pt-5 font-bold text-[#762F43]">
+
               <span>Total payable</span>
 
               <span className="text-lg">
                 ₹{formatPrice(total)}
               </span>
+
             </div>
 
             <p className="mt-5 text-xs leading-6 text-[#806F70]">

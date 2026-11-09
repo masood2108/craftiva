@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
+
 import {
   Plus,
   Package,
   ShoppingBag,
   Settings,
-  LogOut,
   Pencil,
   Trash2,
   Filter,
@@ -121,6 +121,11 @@ export default function AdminDashboard() {
       icon: CreditCard,
       to: "/admin/payments",
     },
+    {
+      label: "Settings",
+      icon: Settings,
+      to: "/admin/settings",
+    },
   ];
 
   const SidebarContent = ({ mobile = false }) => (
@@ -155,11 +160,6 @@ export default function AdminDashboard() {
             </Link>
           );
         })}
-
-        <div className="flex items-center gap-3 px-4 py-3 text-sm text-white/40">
-          <Settings size={18} />
-          Settings
-        </div>
       </nav>
 
       <Link
@@ -197,12 +197,12 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-[#f7f6f2]">
       <div className="flex min-h-screen">
 
-        {/* Desktop Sidebar */}
+        {/* DESKTOP SIDEBAR */}
         <aside className="hidden w-64 shrink-0 flex-col bg-[#171717] p-7 text-white md:flex">
           <SidebarContent />
         </aside>
 
-        {/* Mobile Sidebar Overlay */}
+        {/* MOBILE SIDEBAR OVERLAY */}
         {mobileMenuOpen && (
           <div className="fixed inset-0 z-50 md:hidden">
             <button
@@ -213,6 +213,7 @@ export default function AdminDashboard() {
             />
 
             <aside className="absolute left-0 top-0 flex h-full w-[280px] max-w-[85vw] flex-col bg-[#171717] p-7 text-white shadow-2xl">
+
               <div className="mb-8 flex items-center justify-between">
                 <span className="text-xs uppercase tracking-widest text-white/40">
                   Navigation
@@ -228,17 +229,19 @@ export default function AdminDashboard() {
               </div>
 
               <SidebarContent mobile />
+
             </aside>
           </div>
         )}
 
-        {/* Main Content */}
+        {/* MAIN CONTENT */}
         <main className="min-w-0 flex-1 p-4 sm:p-6 md:p-10">
 
-          {/* Header */}
+          {/* HEADER */}
           <div className="flex items-start justify-between gap-3">
 
             <div className="flex items-start gap-3">
+
               <button
                 onClick={() => setMobileMenuOpen(true)}
                 className="mt-1 rounded-lg border border-[#e8e5de] bg-white p-2.5 text-gray-700 hover:bg-gray-50 md:hidden"
@@ -260,6 +263,7 @@ export default function AdminDashboard() {
                   Manage your CRAFTIVA product catalogue.
                 </p>
               </div>
+
             </div>
 
             <Link
@@ -270,9 +274,10 @@ export default function AdminDashboard() {
               <span className="hidden sm:inline">Add product</span>
               <span className="sm:hidden">Add</span>
             </Link>
+
           </div>
 
-          {/* Statistics */}
+          {/* STATISTICS */}
           <div className="mt-7 grid grid-cols-2 gap-3 sm:mt-10 sm:gap-5">
 
             <div className="border border-[#e8e5de] bg-white p-4 sm:p-6">
@@ -296,12 +301,15 @@ export default function AdminDashboard() {
                 ).length}
               </h3>
             </div>
+
           </div>
 
-          {/* Category Filters */}
+          {/* CATEGORY FILTERS */}
           <div className="mt-8 sm:mt-10">
+
             <div className="mb-4 flex items-center gap-2">
               <Filter size={16} className="text-gray-500" />
+
               <h3 className="text-sm font-semibold">
                 Filter by category
               </h3>
@@ -322,12 +330,14 @@ export default function AdminDashboard() {
                 </button>
               ))}
             </div>
+
           </div>
 
-          {/* Product Catalogue */}
+          {/* PRODUCT CATALOGUE */}
           <section className="mt-5 border border-[#e8e5de] bg-white sm:mt-6">
 
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e8e5de] px-4 py-4 sm:px-6 sm:py-5">
+
               <h3 className="text-sm font-semibold sm:text-base">
                 {activeCategory === "All"
                   ? "Product catalogue"
@@ -337,6 +347,7 @@ export default function AdminDashboard() {
               <span className="text-[11px] text-gray-400 sm:text-xs">
                 {filteredProducts.length} products
               </span>
+
             </div>
 
             {loading ? (
@@ -344,6 +355,7 @@ export default function AdminDashboard() {
                 Loading products...
               </p>
             ) : filteredProducts.length === 0 ? (
+
               <div className="p-10 text-center sm:p-12">
                 <Package
                   className="mx-auto text-gray-300"
@@ -358,14 +370,18 @@ export default function AdminDashboard() {
                   No products available in this category.
                 </p>
               </div>
+
             ) : (
               <>
-                {/* Mobile Product Cards */}
+
+                {/* MOBILE PRODUCT CARDS */}
                 <div className="divide-y divide-gray-100 md:hidden">
+
                   {filteredProducts.map((product) => (
                     <div key={product.id} className="p-4">
 
                       <div className="flex gap-3">
+
                         <img
                           src={product.image || product.images?.[0]}
                           alt={product.name}
@@ -373,6 +389,7 @@ export default function AdminDashboard() {
                         />
 
                         <div className="min-w-0 flex-1">
+
                           <h4 className="break-words text-sm font-semibold text-gray-800">
                             {product.name}
                           </h4>
@@ -396,6 +413,7 @@ export default function AdminDashboard() {
                               ? "Unavailable"
                               : "Available"}
                           </span>
+
                         </div>
                       </div>
 
@@ -405,11 +423,14 @@ export default function AdminDashboard() {
 
                     </div>
                   ))}
+
                 </div>
 
-                {/* Desktop Product Table */}
+                {/* DESKTOP PRODUCT TABLE */}
                 <div className="hidden overflow-x-auto md:block">
+
                   <table className="w-full min-w-[650px] text-left text-sm">
+
                     <thead className="bg-[#faf9f6] text-xs text-gray-400">
                       <tr>
                         <th className="px-6 py-4">Product</th>
@@ -421,13 +442,16 @@ export default function AdminDashboard() {
                     </thead>
 
                     <tbody>
+
                       {filteredProducts.map((product) => (
                         <tr
                           key={product.id}
                           className="border-t border-gray-100"
                         >
+
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
+
                               <img
                                 src={product.image || product.images?.[0]}
                                 alt={product.name}
@@ -437,6 +461,7 @@ export default function AdminDashboard() {
                               <span className="font-medium">
                                 {product.name}
                               </span>
+
                             </div>
                           </td>
 
@@ -463,16 +488,22 @@ export default function AdminDashboard() {
                           <td className="px-6 py-4">
                             <ProductActions product={product} />
                           </td>
+
                         </tr>
                       ))}
+
                     </tbody>
+
                   </table>
+
                 </div>
+
               </>
             )}
+
           </section>
 
-          {/* Mobile Storefront Link */}
+          {/* MOBILE STOREFRONT LINK */}
           <Link
             to="/"
             className="mt-6 flex items-center justify-center gap-2 border border-[#e8e5de] bg-white px-4 py-3 text-xs font-medium text-gray-600 md:hidden"

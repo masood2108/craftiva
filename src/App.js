@@ -24,6 +24,7 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminProductForm from "./pages/AdminProductForm";
 import AdminOrders from "./pages/AdminOrders";
+import AdminSettings from "./pages/AdminSettings";
 
 function Footer() {
   return (
@@ -115,7 +116,6 @@ export default function App() {
 
   const location = useLocation();
 
-  // Hide storefront navigation on admin pages
   const isAdminPage = location.pathname.startsWith("/admin");
 
   const getCartItemKey = (item) =>
@@ -185,12 +185,12 @@ export default function App() {
     <>
       <ScrollToTop />
 
-      {/* Storefront Navbar - hidden on admin pages */}
       {!isAdminPage && (
         <Navbar cartCount={cartCount} />
       )}
 
       <Routes>
+
         {/* STOREFRONT */}
         <Route
           path="/"
@@ -250,6 +250,16 @@ export default function App() {
           element={
             <AdminRoute>
               <AdminDashboard />
+            </AdminRoute>
+          }
+        />
+
+        {/* ADMIN SETTINGS */}
+        <Route
+          path="/admin/settings"
+          element={
+            <AdminRoute>
+              <AdminSettings />
             </AdminRoute>
           }
         />
@@ -320,9 +330,9 @@ export default function App() {
             </main>
           }
         />
+
       </Routes>
 
-      {/* Storefront Footer - hidden on admin pages */}
       {!isAdminPage && <Footer />}
     </>
   );
